@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\PurchaseHead;
 use App\Models\Supplier;
-use App\Models\Product;
 use App\Services\PurchaseService;
 use Illuminate\Http\Request;
 
@@ -25,25 +24,24 @@ class PurchaseController extends Controller
     public function create()
     {
         $suppliers = Supplier::where('is_active', true)->orderBy('name')->get();
-        $products = Product::where('is_active', true)->orderBy('name')->get();
-        return view('purchases.form', compact('suppliers', 'products'));
+        return view('purchases.form', compact('suppliers'));
     }
 
     public function store(Request $request, PurchaseService $purchaseService)
     {
         $request->validate([
-            'supplier_id' => 'required|exists:suppliers,id',
-            'items' => 'required|array|min:1',
-            'items.*.product_id' => 'required|exists:products,id',
-            'items.*.unit_cost' => 'required|numeric|min:0',
-            'items.*.quantity' => 'required|integer|min:1',
+            'supplier_id'             => 'required|exists:suppliers,id',
+            'items'                   => 'required|array|min:1',
+            'items.*.product_id'      => 'required|exists:products,id',
+            'items.*.unit_cost'       => 'required|numeric|min:0',
+            'items.*.quantity'        => 'required|integer|min:1',
         ]);
 
         try {
             $purchaseService->createPurchase(
                 $request->only(['supplier_id', 'purchase_date', 'discount_amount', 'tax_amount', 'notes']),
                 $request->items,
-                (int) $request->user()->id   // ← kirim userId
+                (int) $request->user()->id
             );
             return redirect()->route('purchases.index')->with('success', 'Purchase Order berhasil dibuat');
         } catch (\Exception $e) {
@@ -62,8 +60,10 @@ class PurchaseController extends Controller
         try {
             $purchaseService->receivePurchase(
                 $purchase,
-                (int) $request->user()->id   // ← kirim userId
+                (int) $request->user()->id
             );
+            return redirect()->route('purchases.show', $purchase)
+                ->with('success', 'Barang berhasil diterima, stok telah diperbarui');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }

@@ -25,19 +25,49 @@
                 {{-- Item Search + Add --}}
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Cari Produk</label>
-                    <div class="relative">
-                        <input type="text" x-model="productSearch" @input.debounce.300ms="searchProduct()"
-                               placeholder="Ketik nama produk..."
-                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                    <div class="relative" x-on:click.outside="searchResults = []">
+                        <input
+                            type="text"
+                            x-model="productSearch"
+                            @input.debounce.300ms="searchProduct()"
+                            @keydown.escape="searchResults = []"
+                            placeholder="Ketik nama atau SKU produk..."
+                            autocomplete="off"
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                        >
+
+                        {{-- Loading indicator --}}
+                        <div x-show="searching" class="absolute right-3 top-2.5">
+                            <svg class="animate-spin h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                            </svg>
+                        </div>
+
+                        {{-- Dropdown hasil pencarian --}}
                         <div x-show="searchResults.length > 0"
-                             class="absolute z-10 w-full bg-white border rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto">
+                             x-transition
+                             class="absolute z-10 w-full bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-56 overflow-y-auto">
                             <template x-for="p in searchResults" :key="p.id">
                                 <button type="button" @click="addItem(p)"
-                                        class="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm border-b">
-                                    <span class="font-medium" x-text="p.name"></span>
-                                    <span class="text-gray-400 ml-2" x-text="p.sku"></span>
+                                        class="w-full text-left px-4 py-2.5 hover:bg-indigo-50 text-sm border-b border-gray-50 flex items-center justify-between">
+                                    <span>
+                                        <span class="font-medium text-gray-800" x-text="p.name"></span>
+                                        <span class="text-gray-400 text-xs ml-2" x-text="p.sku"></span>
+                                    </span>
+                                    <span class="text-xs text-gray-500">
+                                        Stok: <span x-text="p.stock"></span>
+                                        &nbsp;|&nbsp;
+                                        <span x-text="formatRp(p.cost_price)"></span>
+                                    </span>
                                 </button>
                             </template>
+                        </div>
+
+                        {{-- Tidak ditemukan --}}
+                        <div x-show="notFound"
+                             class="absolute z-10 w-full bg-white border border-gray-200 rounded-lg shadow-lg mt-1 px-4 py-3 text-sm text-gray-400">
+                            Produk tidak ditemukan.
                         </div>
                     </div>
                 </div>
@@ -57,18 +87,21 @@
                         <tbody>
                             <template x-for="(item, idx) in items" :key="idx">
                                 <tr class="border-b">
-                                    <td class="px-4 py-2 font-medium" x-text="item.name"></td>
                                     <td class="px-4 py-2">
-                                        <input type="number" x-model.number="item.unit_cost" min="0"
-                                               class="w-full text-right border border-gray-300 rounded px-2 py-1 text-sm">
+                                        <p class="font-medium text-gray-800" x-text="item.name"></p>
+                                        <p class="text-xs text-gray-400" x-text="item.sku"></p>
+                                    </td>
+                                    <td class="px-4 py-2">
+                                        <input type="number" x-model.number="item.unit_cost" min="0" step="1"
+                                               class="w-full text-right border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-300">
                                     </td>
                                     <td class="px-4 py-2">
                                         <input type="number" x-model.number="item.quantity" min="1"
-                                               class="w-full text-center border border-gray-300 rounded px-2 py-1 text-sm">
+                                               class="w-full text-center border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-300">
                                     </td>
                                     <td class="px-4 py-2 text-right font-medium" x-text="formatRp(item.unit_cost * item.quantity)"></td>
                                     <td class="px-4 py-2 text-center">
-                                        <button type="button" @click="items.splice(idx, 1)" class="text-red-500 hover:text-red-700">
+                                        <button type="button" @click="items.splice(idx, 1)" class="text-red-400 hover:text-red-600">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                                             </svg>
@@ -77,7 +110,9 @@
                                 </tr>
                             </template>
                             <tr x-show="items.length === 0">
-                                <td colspan="5" class="px-4 py-8 text-center text-gray-400">Belum ada item. Cari dan tambahkan produk di atas.</td>
+                                <td colspan="5" class="px-4 py-10 text-center text-gray-400">
+                                    Belum ada item. Cari dan tambahkan produk di atas.
+                                </td>
                             </tr>
                         </tbody>
                         <tfoot class="bg-gray-50">
@@ -96,8 +131,8 @@
                 </div>
 
                 <div class="flex items-center gap-3 mt-6 pt-4 border-t">
-                    <button type="submit" :disabled="items.length === 0 || submitting"
-                            class="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 text-white text-sm font-medium rounded-lg transition">
+                    <button type="submit" :disabled="items.length === 0 || !form.supplier_id || submitting"
+                            class="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition">
                         <span x-text="submitting ? 'Menyimpan...' : 'Simpan PO'"></span>
                     </button>
                     <a href="{{ route('purchases.index') }}" class="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition">Batal</a>
@@ -110,10 +145,16 @@
     <script>
     function purchaseForm() {
         return {
-            form: { supplier_id: '', purchase_date: new Date().toISOString().split('T')[0], notes: '' },
+            form: {
+                supplier_id: '',
+                purchase_date: new Date().toISOString().split('T')[0],
+                notes: '',
+            },
             items: [],
             productSearch: '',
             searchResults: [],
+            searching: false,
+            notFound: false,
             submitting: false,
 
             get grandTotal() {
@@ -121,24 +162,44 @@
             },
 
             async searchProduct() {
-                if (this.productSearch.length < 2) { this.searchResults = []; return; }
-                const res = await fetch(`/api/products/search?q=${encodeURIComponent(this.productSearch)}`);
-                this.searchResults = await res.json();
+                this.notFound = false;
+                if (this.productSearch.length < 2) {
+                    this.searchResults = [];
+                    return;
+                }
+
+                this.searching = true;
+                try {
+                    const res = await fetch(`/api/products/search?q=${encodeURIComponent(this.productSearch)}`, {
+                        headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    });
+                    const data = await res.json();
+                    this.searchResults = data;
+                    this.notFound = data.length === 0;
+                } catch (e) {
+                    console.error('Search error:', e);
+                } finally {
+                    this.searching = false;
+                }
             },
 
             addItem(product) {
                 const existing = this.items.find(i => i.product_id === product.id);
-                if (existing) { existing.quantity++; }
-                else {
+                if (existing) {
+                    existing.quantity++;
+                } else {
                     this.items.push({
                         product_id: product.id,
                         name: product.name,
-                        unit_cost: parseFloat(product.selling_price),
+                        sku: product.sku,
+                        // Gunakan cost_price (harga beli), fallback ke 0 jika kosong
+                        unit_cost: parseFloat(product.cost_price) || 0,
                         quantity: 1,
                     });
                 }
                 this.productSearch = '';
                 this.searchResults = [];
+                this.notFound = false;
             },
 
             async submitForm() {
@@ -161,15 +222,28 @@
                             })),
                         }),
                     });
-                    if (res.redirected) { window.location.href = res.url; return; }
+
+                    if (res.redirected) {
+                        window.location.href = res.url;
+                        return;
+                    }
+
                     const data = await res.json();
-                    if (data.errors) { alert(Object.values(data.errors).flat().join('\n')); }
-                    else { window.location.href = '{{ route("purchases.index") }}'; }
-                } catch (e) { alert('Error: ' + e.message); }
-                finally { this.submitting = false; }
+                    if (data.errors) {
+                        alert(Object.values(data.errors).flat().join('\n'));
+                    } else {
+                        window.location.href = '{{ route("purchases.index") }}';
+                    }
+                } catch (e) {
+                    alert('Error: ' + e.message);
+                } finally {
+                    this.submitting = false;
+                }
             },
 
-            formatRp(n) { return 'Rp ' + new Intl.NumberFormat('id-ID').format(Math.round(n)); },
+            formatRp(n) {
+                return 'Rp ' + new Intl.NumberFormat('id-ID').format(Math.round(n || 0));
+            },
         };
     }
     </script>
